@@ -77,8 +77,8 @@ Stellar Nexus is a simple yet powerful payment application that allows users to 
   > *(Upload a screenshot showing the StellarWalletsKit modal)*
   ![Wallet Options](./screenshots/wallet_options.png)
 - **Deployed contract address:**
-  `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` *(Native Soroban Interface)*
+  [CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC](https://testnet.steexp.com/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) *(Native Soroban Interface)*
 - **Transaction hash of a contract call (verifiable on Stellar Explorer):**
-  `5b6b965e709248111bda1a4c287d4a347d1e013e2c362bf91e9161692a9981b8`
+  [5b6b965e709248111bda1a4c287d4a347d1e013e2c362bf91e9161692a9981b8](https://testnet.steexp.com/tx/5b6b965e709248111bda1a4c287d4a347d1e013e2c362bf91e9161692a9981b8)
 
 *Developed for the Stellar Challenge.*
