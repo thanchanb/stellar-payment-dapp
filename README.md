@@ -41,18 +41,19 @@ Stellar Nexus is a simple yet powerful payment application that allows users to 
 *(To the reviewer: These are standard locations where screenshots would reside)*
 
 ### 1. Wallet Connected State & Balance Displayed
-> Displays connected status, network badge, and the loaded balance. <img width="1512" height="982" alt="Screenshot 2026-03-17 at 2 55 23 PM" src="https://github.com/user-attachments/assets/80203814-d8e5-4004-bdea-f950ed49221b" />
+> Displays connected status, network badge, and the loaded balance.
+![Wallet Connected & Balance](./screenshots/wallet_connected.png)
 
 
 
-### 2. Transaction Setup Setup
+### 2. Transaction Interface
 > The input fields and premium form UI for setting recipient and amount.
-<img width="1512" height="982" alt="Screenshot 2026-03-17 at 2 59 18 PM" src="https://github.com/user-attachments/assets/26f4d475-1d47-4e9c-93b3-13d98a78ee74" />
+![Transaction UI](./screenshots/transaction_ui.png)
 
 
-### 3. Successful Testnet Transaction
+### 3. Successful Testnet Transaction Result
 > Displays a success overlay and the resulting transaction hash. Follow the explorer link to check finality!
-<img width="1512" height="982" alt="Screenshot 2026-03-17 at 2 55 44 PM" src="https://github.com/user-attachments/assets/35d13b4a-fffa-4004-a73a-af2e2da0b340" />
+![Success Transaction](./screenshots/success_tx.png)
 
 
 
@@ -73,9 +74,8 @@ Stellar Nexus is a simple yet powerful payment application that allows users to 
 
 ### Required Information
 - **Live demo link (deployed on Vercel, Netlify, or similar):** `[Insert Link Here]` *(Optional)*
-- **Screenshot of wallet options available:** 
-  > *(Upload a screenshot showing the StellarWalletsKit modal)*
-  ![Wallet Options](./screenshots/wallet_options.png)
+  > *(Screenshot showing the StellarWalletsKit connectivity status)*
+  ![Wallet Connected](./screenshots/wallet_connected.png)
 - **Deployed contract address:**
   [CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC](https://testnet.steexp.com/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) *(Native Soroban Interface)*
 - **Transaction hash of a contract call (verifiable on Stellar Explorer):**
