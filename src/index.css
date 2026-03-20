@@ -1,16 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-color: #0b0c10;
+  --primary-color: #7b2cbf;
+  --secondary-color: #9d4edd;
+  --bg-color: #0f1016;
   --panel-bg: rgba(255, 255, 255, 0.03);
-  --panel-border: rgba(255, 255, 255, 0.08);
+  --border-color: rgba(255, 255, 255, 0.08);
+  /* Replaces --panel-border */
   --text-primary: #ffffff;
-  --text-secondary: #8b92a5;
+  --text-secondary: #9ca3af;
+  /* Updated value */
   --accent-color: #6c5ce7;
+  /* Kept from original */
   --accent-hover: #8073ed;
-  --success-color: #00b894;
-  --error-color: #ff7675;
+  /* Kept from original */
+  --success-color: #10b981;
+  /* Updated value */
+  --error-color: #ef4444;
+  /* Updated value */
+  --pending-color: #f59e0b;
+  /* New variable */
   --font-family: 'Inter', sans-serif;
+  /* Kept from original */
 }
 
 * {
@@ -27,7 +38,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 50%, rgba(108, 92, 231, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(108, 92, 231, 0.15), transparent 25%);
   background-attachment: fixed;
@@ -35,8 +46,10 @@ body {
 
 #root {
   width: 100%;
-  max-width: 1200px;
+  max-width: 100%;
+  /* Updated from 1200px */
   padding: 2rem;
+  /* Moved from inside .glass-panel */
 }
 
 .glass-panel {
@@ -179,8 +192,15 @@ body {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -236,6 +256,17 @@ body {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-pending {
+  background-color: rgba(255, 179, 71, 0.1);
+  border-left: 4px solid #ffb347;
+  color: #ffb347;
 }

@@ -1,48 +1,50 @@
 import { useState, useEffect } from 'react';
-import { Wallet, LogOut, Send, ArrowRight, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Wallet, LogOut, Send, ArrowRight, CheckCircle, AlertCircle, RefreshCw, Code } from 'lucide-react';
 import {
   checkWalletConnection,
+  connectWalletKit,
   fetchBalance,
-  sendXLM
+  sendXLM,
+  invokeContractMethod,
+  getTransactionStatus
 } from './lib/stellar';
 import './index.css';
 
 function App() {
   const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>("0.00");
+
+  // Payment State
   const [recipient, setRecipient] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
 
+  // Contract State
+  const [contractId, setContractId] = useState<string>("");
+  const [method, setMethod] = useState<string>("");
+  const [args, setArgs] = useState<string>("");
+  const [contractTxStatus, setContractTxStatus] = useState<string>("");
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error', message: string, txHash?: string } | null>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error' | 'pending', message: string, txHash?: string } | null>(null);
 
   // Auto connect logic
   useEffect(() => {
-    checkConnection();
-  }, []);
-
-  const checkConnection = async () => {
-    setIsConnecting(true);
-    try {
-      // The freighter API checkWalletConnection returns a string (the public key) if connected
-      const connectedAddress = await checkWalletConnection();
-      if (typeof connectedAddress === 'string') {
-        setAddress(connectedAddress);
-        updateBalance(connectedAddress);
+    const init = async () => {
+      const addr = await checkWalletConnection();
+      if (addr) {
+        setAddress(addr);
+        updateBalance(addr);
       }
-    } catch (error) {
-      console.error("Connection error", error);
-    }
-    setIsConnecting(false);
-  };
+    };
+    init();
+  }, []);
 
   const updateBalance = async (pubKey: string) => {
     try {
       const b = await fetchBalance(pubKey);
       setBalance(b);
-    } catch (e) {
-      console.error(e);
+    } catch {
       setBalance("0.00");
     }
   };
@@ -51,25 +53,21 @@ function App() {
     setStatus(null);
     setIsConnecting(true);
     try {
-      // For some reason if the promise returns a string, we treat it as address
-      // Need a proper way to request access but checkWalletConnection handles it.
-      const connectedAddress = await checkWalletConnection();
-      if (typeof connectedAddress === 'string') {
+      const connectedAddress = await connectWalletKit();
+      if (connectedAddress) {
         setAddress(connectedAddress);
         await updateBalance(connectedAddress);
         setStatus({ type: 'success', message: 'Wallet connected successfully!' });
       } else {
-        throw new Error("Freighter not installed or connection rejected.");
+        throw new Error("Wallet not found or rejected popup.");
       }
-    } catch (err: any) {
-      setStatus({ type: 'error', message: err.message || "Failed to connect wallet." });
+    } catch (err: unknown) {
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : "Failed to connect wallet via Kit." });
     }
     setIsConnecting(false);
   };
 
   const disconnectWallet = () => {
-    // Freighter doesn't have a direct "disconnect" that revokes permissions via API currently without extra logic, 
-    // but we can clear local state to simulate logout
     setAddress(null);
     setBalance("0.00");
     setStatus(null);
@@ -94,7 +92,10 @@ function App() {
         throw new Error("Invalid amount.");
       }
 
-      // 1. sendXLM returns the transaction hash
+      if (parseFloat(balance) < parsedAmount) {
+        throw new Error("Insufficient XLM balance.");
+      }
+
       const txHash = await sendXLM(address, recipient, amount);
 
       setStatus({
@@ -106,10 +107,9 @@ function App() {
       setAmount("");
       setRecipient("");
 
-      // Update balance
       await updateBalance(address);
-    } catch (err: any) {
-      setStatus({ type: 'error', message: err.message || "Transaction failed." });
+    } catch (err: unknown) {
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : "Transaction failed." });
     }
     setIsLoading(false);
   };
@@ -122,18 +122,64 @@ function App() {
       if (!res.ok) throw new Error("Friendbot failed or you're already funded.");
       setStatus({ type: 'success', message: '10,000 Testnet XLM requested seamlessly!' });
       await updateBalance(address);
-    } catch (e: any) {
-      setStatus({ type: 'error', message: e.message || "Faucet error." });
+    } catch (e: unknown) {
+      setStatus({ type: 'error', message: e instanceof Error ? e.message : "Faucet error." });
     }
     setIsLoading(false);
   };
 
+  const handleContractSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address) return;
+    setIsLoading(true);
+    setStatus(null);
+    setContractTxStatus("Deploying/Executing...");
+
+    try {
+      const argsArray = args ? args.split(",").map(a => a.trim()) : [];
+      const hash = await invokeContractMethod(address, contractId, method, argsArray);
+
+      setStatus({ type: 'pending', message: 'Transaction submitted. Waiting for confirmation...', txHash: hash });
+      setContractTxStatus("PENDING");
+
+      // Event Listening & Status Synchronization logic
+      let attempts = 0;
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        const statusResp = await getTransactionStatus(hash);
+
+        if (statusResp.status === "SUCCESS") {
+          clearInterval(pollInterval);
+          setContractTxStatus("SUCCESS");
+          setStatus({ type: 'success', message: 'Contract execution SUCCESSFUL! Reads/Writes fully confirmed.', txHash: hash });
+          setIsLoading(false);
+          await updateBalance(address);
+        } else if (statusResp.status === "FAILED") {
+          clearInterval(pollInterval);
+          setContractTxStatus("FAILED");
+          setStatus({ type: 'error', message: 'Contract execution FAILED on-chain.' });
+          setIsLoading(false);
+        } else if (attempts > 15) {
+          clearInterval(pollInterval);
+          setContractTxStatus("UNKNOWN");
+          setStatus({ type: 'error', message: 'Timed out waiting for confirmation.' });
+          setIsLoading(false);
+        }
+      }, 3000);
+
+    } catch (err: unknown) {
+      setContractTxStatus("REJECTED/FAILED");
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : "Contract call failed." });
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="app-container animate-fade-in">
-      <div className="glass-panel">
+      <div className="glass-panel" style={{ maxWidth: '600px', width: '100%' }}>
         <div className="header">
           <h1>Stellar Nexus</h1>
-          <p>Seamless Light-Speed Payments on testnet</p>
+          <p>Seamless Light-Speed Payments & Smart Contracts</p>
         </div>
 
         {!address ? (
@@ -149,10 +195,10 @@ function App() {
               ) : (
                 <Wallet size={24} />
               )}
-              {isConnecting ? "Connecting..." : "Connect Freighter Browser Wallet"}
+              {isConnecting ? "Connecting..." : "Connect Stellar Wallets Kit"}
             </button>
             <p style={{ marginTop: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Requires Freighter Wallet browser extension on Stellar Testnet.
+              Interact with multiple wallets seamlessly via StellarWalletsKit.
             </p>
           </div>
         ) : (
@@ -180,52 +226,113 @@ function App() {
               </div>
             </div>
 
-            <form onSubmit={handleSend}>
-              <div className="form-group">
-                <label className="label">Recipient Address</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="G..."
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+              <h3 style={{ marginBottom: '1rem', color: '#fff', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Send size={18} /> Direct Payment
+              </h3>
+              <form onSubmit={handleSend}>
+                <div className="form-group">
+                  <label className="label">Recipient Address</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="G..."
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
 
-              <div className="form-group">
-                <label className="label">Amount (XLM)</label>
-                <input
-                  type="number"
-                  step="0.0000001"
-                  className="input-field"
-                  placeholder="0.0"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
+                <div className="form-group">
+                  <label className="label">Amount (XLM)</label>
+                  <input
+                    type="number"
+                    step="0.0000001"
+                    className="input-field"
+                    placeholder="0.0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
 
-              <button
-                type="submit"
-                className="btn"
-                style={{ width: '100%', marginTop: '0.5rem' }}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <RefreshCw className="spinner" size={20} />
-                ) : (
-                  <Send size={20} />
-                )}
-                {isLoading ? "Processing Transaction..." : "Send Transaction"}
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ width: '100%', marginTop: '0.5rem' }}
+                  disabled={isLoading}
+                >
+                  {isLoading && contractTxStatus === "" ? (
+                    <RefreshCw className="spinner" size={20} />
+                  ) : (
+                    <Send size={20} />
+                  )}
+                  {"Send XLM"}
+                </button>
+              </form>
+            </div>
+
+            <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+              <h3 style={{ marginBottom: '1rem', color: '#fff', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Code size={18} /> Interact with Smart Contract
+              </h3>
+              <form onSubmit={handleContractSubmit}>
+                <div className="form-group">
+                  <label className="label">Contract ID</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="C..."
+                    value={contractId}
+                    onChange={(e) => setContractId(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="label">Method</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. increment"
+                      value={method}
+                      onChange={(e) => setMethod(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: 2 }}>
+                    <label className="label">Arguments (comma separated)</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. 10, value2"
+                      value={args}
+                      onChange={(e) => setArgs(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{ width: '100%', marginTop: '0.5rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
+                  disabled={isLoading}
+                >
+                  {isLoading && contractTxStatus !== "" ? (
+                    <RefreshCw className="spinner" size={20} />
+                  ) : (
+                    <Code size={20} />
+                  )}
+                  {contractTxStatus ? `Status: ${contractTxStatus}` : "Invoke Contract"}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
         {status && (
-          <div className={`status-message ${status.type === 'success' ? 'status-success' : 'status-error'} animate-fade-in`}>
-            {status.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+          <div className={`status-message ${status.type === 'success' ? 'status-success' : status.type === 'pending' ? 'status-pending' : 'status-error'} animate-fade-in`} style={{ marginTop: '1.5rem' }}>
+            {status.type === 'success' ? <CheckCircle size={20} /> : status.type === 'pending' ? <RefreshCw className="spinner" size={20} /> : <AlertCircle size={20} />}
             <div style={{ wordBreak: 'break-word' }}>
               <div>{status.message}</div>
               {status.txHash && (
